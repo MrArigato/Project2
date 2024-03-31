@@ -1,47 +1,84 @@
+#!/usr/bin/env python3
+
+import argparse
 import socket
 import sys
+from time import sleep
 
-def create_syn_header(sequence_number=0, ack_number=0, flags=0b010):
-    """
-    Constructs a SYN packet header with the specified parameters.
-    Flags are set to indicate SYN packet; for simplicity, we're just using a byte here.
-    """
-    # Header structure: [Sequence Number (4 bytes), Ack Number (4 bytes), Flags (1 byte)]
-    # Note: Adjust this method to match your project's header format and encoding
-    return struct.pack('!IIB', sequence_number, ack_number, flags)
+class ConfundoSocket:
+    def __init__(self, dst_host, dst_port):
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.dst_host = dst_host
+        self.dst_port = dst_port
+        self.connection_id = None
+        self.sequence_number = 50000  # Example initial sequence number
+        self.ack_number = 0
+        self.cwnd = 412  # Initial congestion window size
+        self.mss = 412  # Maximum segment size, adjust as per your project requirements
 
-def send_syn_packet(server_ip, server_port):
-    """
-    Sends a SYN packet to initiate the three-way handshake.
-    """
+    def send_syn(self):
+        # Construct SYN packet here based on project requirements
+        syn_packet = ...
+        self.sock.sendto(syn_packet, (self.dst_host, self.dst_port))
+    
+    def receive_syn_ack(self):
+        # Wait for SYN-ACK; adjust timeout as necessary
+        self.sock.settimeout(10)
+        try:
+            data, addr = self.sock.recvfrom(1024)  # Adjust buffer size as needed
+            # Extract connection ID, sequence number, etc., from received packet
+            # For example:
+            self.connection_id = ...
+            self.sequence_number = ...
+        except socket.timeout:
+            print("Connection timeout.", file=sys.stderr)
+            sys.exit(1)
+    
+    def send_ack(self):
+        # Construct ACK packet here
+        ack_packet = ...
+        self.sock.sendto(ack_packet, (self.dst_host, self.dst_port))
+
+    def send_data(self, data):
+        # Implement sliding window protocol here based on CWND
+        # For simplicity, this example sends data in one go
+        self.sock.sendto(data, (self.dst_host, self.dst_port))
+        self.sequence_number += len(data)
+
+    def close(self):
+        # Send FIN and handle closure
+        fin_packet = ...
+        self.sock.sendto(fin_packet, (self.dst_host, self.dst_port))
+        # Optionally wait for ACK of FIN and send last ACK
+
+def main(host, port, file_path):
+    confundo_socket = ConfundoSocket(host, port)
+    confundo_socket.send_syn()
+    confundo_socket.receive_syn_ack()
+    confundo_socket.send_ack()
+    
     try:
-        # Create a UDP socket
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-        # Construct the SYN packet
-        syn_header = create_syn_header(sequence_number=1000)  # Example sequence number
-        sock.sendto(syn_header, (server_ip, server_port))
-
-        # Wait for SYN-ACK response (simplified, without timeout handling)
-        response, addr = sock.recvfrom(1024)
-        print("Received response from the server.")
-
-        # Here, you would parse the response and check if it's a SYN-ACK,
-        # then proceed to send an ACK. This part is simplified.
-        # ...
-
-        print("SYN packet sent and SYN-ACK received.")
+        with open(file_path, 'rb') as f:
+            while True:
+                chunk = f.read(confundo_socket.mss)
+                if not chunk:
+                    break
+                confundo_socket.send_data(chunk)
+                # Implement ACK reception and congestion control adjustments here
     except Exception as e:
-        print(f"Failed to send SYN packet: {e}")
-        sys.exit(1)
-    finally:
-        sock.close()
+        print(f"Failed to send file: {e}", file=sys.stderr)
+    
+    confundo_socket.close()
 
-if __name__ == "__main__":
-    # Example usage
-    SERVER_IP = '127.0.0.1'  # Replace with actual server IP
-    SERVER_PORT = 5000       # Replace with actual server port
-    send_syn_packet(SERVER_IP, SERVER_PORT)
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Confundo Protocol Client')
+    parser.add_argument('host', help='Hostname or IP address of the server')
+    parser.add_argument('port', type=int, help='Port number of the server')
+    parser.add_argument('file', help='Path to the file to be transferred')
+    args = parser.parse_args()
+    
+    main(args.host, args.port, args.file)
+
 
     
     main(server_ip, server_port, filename)
